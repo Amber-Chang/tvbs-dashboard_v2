@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVBS全會員增長儀表板 V9.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #3B82F6;
+            --secondary-color: #1F2937;
+            --accent-color: #10B981;
+            --danger-color: #F87171;
+            --text-primary: #F9FAFB;
+            --text-secondary: #9CA3AF;
+            --border-color: #374151;
+            --card-bg: #1F2937;
+        }
+        body {
+            background-color: #111827;
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .dashboard-container { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 250px;
+            background-color: var(--secondary-color);
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem 1rem;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .main-content { flex: 1; padding: 1.5rem; overflow-y: auto; }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            padding: 0 0.5rem;
+            color: var(--primary-color);
+        }
+        .nav-tabs { display: flex; flex-direction: column; gap: 0.5rem; }
+        .nav-tab {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+            background: none;
+            color: inherit;
+            font-size: inherit;
+            width: 100%;
+            text-align: left;
+        }
+        .nav-tab:focus { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        .nav-tab-active { background-color: var(--primary-color); color: white; }
+        .nav-tab-inactive { background-color: transparent; color: #D1D5DB; }
+        .nav-tab-inactive:hover { background-color: var(--border-color); }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .kpi-title { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem; }
+        .kpi-value {
+            color: var(--text-primary);
+            font-size: 2.25rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .kpi-change-up { color: var(--accent-color); }
+        .kpi-change-down { color: var(--danger-color); }
+        .sheet-tab-active { background-color: var(--primary-color); color: var(--text-primary); }
+        .sheet-tab-inactive { background-color: var(--border-color); color: var(--text-secondary); }
+        .time-range-button, .composition-ip-button {
+             border: none;
+             background: none;
+             color: inherit;
+             font-size: inherit;
+             cursor: pointer;
+        }
+        .time-range-button:focus, .composition-ip-button:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        .compact-chart-container { position: relative; height: 250px; width: 100%; }
+        .metric-radio:checked+label {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .kpi-row { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .kpi-row .card { flex: 1; min-width: calc(16.666% - 1.5rem); }
+        .sheet-content { display: none; }
+        .sheet-content.active { display: block; }
+        .table-header { background-color: var(--border-color); }
+        .ip-contribution-table th, .ip-contribution-table td { padding: 12px 15px; text-align: right; }
+        .ip-contribution-table th:first-child, .ip-contribution-table td:first-child { text-align: left; }
+        .ip-comparison-table th, .ip-comparison-table td { padding: 12px 15px; text-align: right; }
+        .ip-comparison-table th:first-child, .ip-comparison-table td:first-child { text-align: left; }
+        .metric-value { font-weight: bold; font-size: 1.1rem; }
+        .metric-percentage { font-size: 0.85rem; color: var(--text-secondary); }
+        .metric-change { font-size: 0.85rem; }
+        .metric-change-up { color: var(--accent-color); }
+        .metric-change-down { color: var(--danger-color); }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .chart-card {
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .chart-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem; text-align: center; }
+        .ceo-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+        .ceo-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            background: none;
+            color: inherit;
+            font-size: inherit;
+        }
+        .ceo-tab:focus { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        .analysis-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+        .analysis-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            background: none;
+            color: inherit;
+            font-size: inherit;
+        }
+        .analysis-tab:focus { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+        .analysis-content { display: none; }
+        .analysis-content.active { display: block; }
+        .filter-section {
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+        .dropdown-row { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; }
+        .dropdown-filter { display: flex; flex-direction: column; gap: 0.5rem; }
+        .filter-label { font-size: 0.875rem; color: var(--text-secondary); }
+        .dropdown-select {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+            border: 1px solid #4B5563;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            min-width: 150px;
+        }
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .metric-card {
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+        .metric-title { color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem; }
+        .metric-grid .metric-value { font-size: 1.25rem; font-weight: bold; margin-bottom: 0.25rem; }
+        .metric-grid .metric-percentage { font-size: 0.75rem; }
+        .retention-analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .retention-analysis-chart-container { position: relative; height: 250px; width: 100%; }
+        @media (max-width: 1024px) {
+            .kpi-row .card { min-width: calc(33.333% - 1.5rem); }
+            .chart-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .dashboard-container { flex-direction: column; }
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                height: auto;
+                position: relative;
+            }
+            .nav-tabs { flex-direction: row; overflow-x: auto; padding-bottom: 0.5rem; }
+            .nav-tab { white-space: nowrap; }
+            .kpi-row .card { min-width: calc(50% - 1.5rem); }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-container">
+<nav class="sidebar">
+<div class="logo">集團數據儀表板</div>
+<div class="nav-tabs">
+<button class="nav-tab nav-tab-active" data-sheet="ceo-view">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+</svg>
+TVBS會員總覽
+</button>
+<button class="nav-tab nav-tab-inactive" data-sheet="tvbs">
+<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+</svg>
+TVBS新聞網
+</button>
+</div>
+</nav>
+<main class="main-content">
+<section id="ceo-view" class="sheet-content active">
+<h1 class="text-2xl font-semibold border-l-4 border-blue-500 pl-3 mb-6">TVBS會員總覽</h1>
+<div class="ceo-tabs">
+<button class="ceo-tab sheet-tab-active" data-ceo-tab="core">核心指標</button>
+<button class="ceo-tab sheet-tab-inactive" data-ceo-tab="composition">會員組成</button>
+</div>
+<div id="ceo-core" class="ceo-content active">
+<div class="flex items-center space-x-2 mb-4">
+<span class="font-medium text-sm text-gray-400">時間範圍:</span>
+<div>
+<button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-range="daily">每日</button>
+<button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-range="weekly">每週</button>
+<button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-active" data-range="monthly">每月</button>
+</div>
+</div>
+<div class="kpi-row">
+<div class="card">
+<p class="kpi-title">總瀏覽量 (PV)</p>
+<p class="kpi-value">146.8M</p>
+<div class="flex items-center font-medium kpi-change-down">
+<span>7.0%</span>
+<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+</div>
+</div>
+<div class="card">
+<p class="kpi-title">活躍會員數</p>
+<p class="kpi-value">26.6M</p>
+<div class="flex items-center font-medium kpi-change-down">
+<span>6.7%</span>
+<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+</div>
+</div>
+<div class="card">
+<p class="kpi-title">人均訪問次數</p>
+<p class="kpi-value">3.27</p>
+<div class="flex items-center font-medium kpi-change-down">
+<span>4.1%</span>
+<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+</div>
+</div>
+<div class="card">
+<p class="kpi-title">單次訪問頁數</p>
+<p class="kpi-value">1.69</p>
+<div class="flex items-center font-medium kpi-change-up">
+<span>4.3%</span>
+<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+</div>
+</div>
+</div>
+<div class="card mb-8">
+<div class="flex justify-between items-center mb-4">
+<h2 class="text-xl font-semibold">趨勢分析</h2>
+<div class="flex items-center space-x-2">
+<span class="font-medium text-sm">數據指標:</span>
+<div class="flex space-x-1">
+<input type="radio" id="metric-pv" name="metric" value="pv" class="metric-radio hidden" checked>
+<label for="metric-pv" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-blue-500 text-white">總瀏覽量</label>
+<input type="radio" id="metric-uu" name="metric" value="uu" class="metric-radio hidden">
+<label for="metric-uu" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-gray-700 text-gray-300">活躍會員數</label>
+</div>
+</div>
+</div>
+<div class="chart-container">
+<canvas id="ip-trend-chart"></canvas>
+</div>
+</div>
+</div>
+<div id="ceo-composition" class="ceo-content" hidden>
+<div class="flex justify-end items-center mb-4">
+<div class="flex items-center space-x-2">
+<span class="font-medium text-sm text-gray-400">IP 篩選:</span>
+<div class="flex flex-wrap gap-1">
+<button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-active" data-ip="overall">整體</button>
+<button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="tvbs">TVBS新聞網</button>
+<button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="health">健康2.0</button>
+</div>
+</div>
+</div>
+<div class="chart-grid">
+<div class="chart-card">
+<h3 class="chart-title">會員性別分布</h3>
+<div class="compact-chart-container">
+<canvas id="gender-chart"></canvas>
+</div>
+</div>
+<div class="chart-card">
+<h3 class="chart-title">會員年齡分布</h3>
+<div class="compact-chart-container">
+<canvas id="age-chart"></canvas>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="tvbs" class="sheet-content" hidden>
+<h1 class="text-2xl font-semibold border-l-4 border-blue-500 pl-3 mb-6">TVBS新聞網 詳細數據</h1>
+<div class="analysis-tabs">
+<button class="analysis-tab sheet-tab-active" data-analysis="acquisition">會員指標</button>
+<button class="analysis-tab sheet-tab-inactive" data-analysis="retention">留存指標</button>
+</div>
+<div id="tvbs-acquisition" class="analysis-content active">
+<h2 class="section-title">會員指標分析</h2>
+<div class="metric-grid">
+<div class="metric-card">
+<p class="metric-title">當月活躍會員數</p>
+<p class="metric-value">109,069</p>
+</div>
+<div class="metric-card">
+<p class="metric-title">當月新註冊會員數</p>
+<p class="metric-value">2,451</p>
+</div>
+</div>
+</div>
+<div id="tvbs-retention" class="analysis-content" hidden>
+<h2 class="section-title">留存指標分析</h2>
+<div class="metric-grid">
+<div class="metric-card">
+<p class="metric-title">七日留存率</p>
+<p class="metric-value">24.12%</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<script>
+const chartInstances = new Map();
+let currentCeoTimeRange = 'monthly';
+let currentCeoMetric = 'pv';
+
+const mockCeoData = {
+    monthly: {
+        kpi: { pv: "146.8M", uu: "26.6M", session_uu: "3.27", pv_session: "1.69" },
+        trend: {
+            labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+            pv: [95, 98, 102, 105, 108, 112],
+            uu: [16.5, 16.8, 17.2, 17.5, 17.8, 18.2]
+        }
+    }
+};
+
+const mockCompositionData = {
+    overall: {
+        gender: { data: [52, 45, 3], labels: ['男性', '女性', '其他'] },
+        age: { data: [15, 32, 28, 18, 7], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] }
+    }
+};
+
+function renderChart(canvasId, type, data, options) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (chartInstances.has(canvasId)) chartInstances.get(canvasId).destroy();
+    const chart = new Chart(ctx, { type, data, options });
+    chartInstances.set(canvasId, chart);
+}
+
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { color: '#F9FAFB' } } },
+    scales: {
+        x: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } },
+        y: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } }
+    }
+};
+
+function initCharts() {
+    updateIPChart('ip-trend-chart', 'pv', 'monthly');
+    updateCompositionCharts('overall');
+}
+
+function updateIPChart(chartId, metric, timeRange) {
+    const data = mockCeoData[timeRange];
+    const datasets = metric === 'pv' ? data.trend.pv : data.trend.uu;
+    const label = metric === 'pv' ? '總瀏覽量' : '活躍會員數';
+    renderChart(chartId, 'line', {
+        labels: data.trend.labels,
+        datasets: [{
+            label: label,
+            data: datasets,
+            borderColor: '#3B82F6',
+            backgroundColor: '#3B82F620',
+            fill: true,
+            tension: 0.4
+        }]
+    }, chartOptions);
+}
+
+function updateCompositionCharts(ipFilter) {
+    const data = mockCompositionData[ipFilter] || mockCompositionData.overall;
+    const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#F9FAFB' } } } };
+    renderChart('gender-chart', 'doughnut', {
+        labels: data.gender.labels,
+        datasets: [{ data: data.gender.data, backgroundColor: ['#3B82F6', '#EC4899', '#6B7280'] }]
+    }, options);
+    renderChart('age-chart', 'doughnut', {
+        labels: data.age.labels,
+        datasets: [{ data: data.age.data, backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6'] }]
+    }, options);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const sheetId = tab.getAttribute('data-sheet');
+            document.querySelectorAll('.nav-tab').forEach(t => {
+                t.classList.replace('nav-tab-active', 'nav-tab-inactive');
+            });
+            tab.classList.replace('nav-tab-inactive', 'nav-tab-active');
+            document.querySelectorAll('.sheet-content').forEach(content => {
+                content.classList.remove('active');
+                content.setAttribute('hidden', 'true');
+            });
+            const activeContent = document.getElementById(sheetId);
+            if (activeContent) {
+                activeContent.classList.add('active');
+                activeContent.removeAttribute('hidden');
+            }
+        });
+    });
+    
+    document.querySelectorAll('.ceo-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const ceoTabType = tab.getAttribute('data-ceo-tab');
+            document.querySelectorAll('.ceo-tab').forEach(t => {
+                t.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+            });
+            tab.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+            document.querySelectorAll('.ceo-content').forEach(content => {
+                content.classList.remove('active');
+                content.setAttribute('hidden', 'true');
+            });
+            const activeContent = document.getElementById(`ceo-${ceoTabType}`);
+            if (activeContent) {
+                activeContent.classList.add('active');
+                activeContent.removeAttribute('hidden');
+            }
+        });
+    });
+    
+    document.querySelectorAll('.analysis-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const analysisType = tab.getAttribute('data-analysis');
+            document.querySelectorAll('.analysis-tab').forEach(t => {
+                t.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+            });
+            tab.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+            document.querySelectorAll('.analysis-content').forEach(content => {
+                content.classList.remove('active');
+                content.setAttribute('hidden', 'true');
+            });
+            const activeContent = document.getElementById(`tvbs-${analysisType}`);
+            if (activeContent) {
+                activeContent.classList.add('active');
+                activeContent.removeAttribute('hidden');
+            }
+        });
+    });
+    
+    document.querySelectorAll('.composition-ip-button').forEach(button => {
+        button.addEventListener('click', () => {
+            document.querySelectorAll('.composition-ip-button').forEach(btn => {
+                btn.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+            });
+            button.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+            const selectedIp = button.getAttribute('data-ip');
+            updateCompositionCharts(selectedIp);
+        });
+    });
+    
+    document.querySelectorAll('.metric-radio').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                document.querySelectorAll('.metric-radio + label').forEach(label => {
+                    label.classList.remove('bg-blue-500', 'text-white');
+                    label.classList.add('bg-gray-700', 'text-gray-300');
+                });
+                this.nextElementSibling.classList.remove('bg-gray-700', 'text-gray-300');
+                this.nextElementSibling.classList.add('bg-blue-500', 'text-white');
+                currentCeoMetric = this.value;
+                updateIPChart('ip-trend-chart', currentCeoMetric, currentCeoTimeRange);
+            }
+        });
+    });
+});
+</script>
+</body>
+</html>

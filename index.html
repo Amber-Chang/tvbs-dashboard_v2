@@ -6,6 +6,39 @@
     <title>TVBS全會員增長儀表板 V9.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Chosen Palette: Dark Mode (Blue/Green/Gray) -->
+    <!-- Application Structure Plan: 
+        此 SPA 採用雙主分頁JS導航結構：「TVBS會員總覽」(ceo-view) 和「TVBS新聞網」(tvbs)。
+        1. 「TVBS會員總覽」（預設視圖）：
+           - 此頁面包含自己的子分頁：「核心指標」和「會員組成」。
+           - 「核心指標」頁：頂部新增「時間範圍」全域篩選器 (日/週/月)。此篩選器將連動控制下方的 KPI 卡片、主趨勢圖和 IP 核心指標表格。
+           - 「會員組成」頁：新增「IP 篩選器」（已修改為按鈕樣式）。此篩選器將連動控制下方的四個會員分佈圖表（性別、年齡等）。
+        2. 「TVBS新聞網」（第二主頁）：
+           - 此頁面專注於單一 IP 的深度分析，包含四個子分頁：「會員」、「留存」、「互動」、「價值」。
+           - 每個子分頁都包含一組專屬的 KPI 卡片 (Metric Grid) 和相關的趨勢圖表 (Line/Bar/Funnel Charts)。
+           - 此頁面包含一個獨立的篩選器（平台、用戶別、來源），用於未來擴展數據過濾功能。
+        - 為何選擇此結構？ 此設計將「集團層級」的總覽 (CEO View) 與「IP 層級」的深度下鑽 (TVBS View) 清晰地分離到兩個獨立的主工作區。在每個工作區内，再使用子分頁來組織相關的分析主題。新增的連動篩選器（時間範圍和 IP 篩選）大幅提升了儀表板的互動性和自助分析能力，讓使用者能更靈活地探索數據。
+    -->
+    <!-- Visualization & Content Choices: 
+        - CEO 核心指標 (CSV) -> 目標: 告知/比較
+          - 呈現方式: KPI 卡片 + 可切換指標的趨勢圖 (Chart.js Line) + HTML 比較表格。
+          - 互動: 1. 點擊「時間範圍」按鈕 (日/週/月) -> 更新所有卡片、圖表、表格。 2. 點擊 Radio Buttons 切換趨勢圖的指標 (PV, UU, ...)。
+          - 理由: 提供高層級概覽，並允許對核心指標的時間趨勢和時間粒度進行快速比較。
+          - 庫: Chart.js (Canvas)。
+        - CEO 會員組成 (CSV) -> 目標: 告知/組織
+          - 呈現方式: 4 個甜甜圈圖 (Chart.js Doughnut) + HTML 表格。
+          - 互動: 1. 點擊「IP 篩選器」按鈕 -> 更新所有四個圖表。
+          - 理由: 快速傳達不同 IP 的會員人口統計學分佈和資料完整性。
+          - 庫: Chart.js (Canvas)。
+        - TVBS 各分析主題 (CSV) -> 目標: 告知/分析
+          - 呈現方式: 每個主題 (成長/留存/...) 均使用 KPI 卡片網格 (Metric Grid) + 專屬圖表 (Line, Bar, Funnel)。
+          - 互動: 透過頂部「分析頁籤」切換不同的主題儀表板。
+          - 理由: 將複雜的會員分析拆解為四個獨立的、易於理解的主題儀表板，便於集中分析。
+          - 庫: Chart.js (Canvas)。
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
     <style>
         :root {
             --primary-color: #3B82F6;
@@ -17,6 +50,7 @@
             --border-color: #374151;
             --card-bg: #1F2937;
         }
+
         body {
             background-color: #111827;
             color: var(--text-primary);
@@ -24,7 +58,12 @@
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        .dashboard-container { display: flex; min-height: 100vh; }
+
+        .dashboard-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
         .sidebar {
             width: 250px;
             background-color: var(--secondary-color);
@@ -36,7 +75,13 @@
             height: 100vh;
             overflow-y: auto;
         }
-        .main-content { flex: 1; padding: 1.5rem; overflow-y: auto; }
+
+        .main-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
         .logo {
             font-size: 1.5rem;
             font-weight: bold;
@@ -44,7 +89,13 @@
             padding: 0 0.5rem;
             color: var(--primary-color);
         }
-        .nav-tabs { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        .nav-tabs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
         .nav-tab {
             padding: 0.75rem 1rem;
             border-radius: 0.5rem;
@@ -60,10 +111,26 @@
             width: 100%;
             text-align: left;
         }
-        .nav-tab:focus { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-        .nav-tab-active { background-color: var(--primary-color); color: white; }
-        .nav-tab-inactive { background-color: transparent; color: #D1D5DB; }
-        .nav-tab-inactive:hover { background-color: var(--border-color); }
+
+        .nav-tab:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        .nav-tab-active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .nav-tab-inactive {
+            background-color: transparent;
+            color: #D1D5DB;
+        }
+
+        .nav-tab-inactive:hover {
+            background-color: var(--border-color);
+        }
+
         .card {
             background-color: var(--card-bg);
             border-radius: 0.75rem;
@@ -71,54 +138,157 @@
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        .kpi-title { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem; }
+
+        .kpi-title {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
         .kpi-value {
             color: var(--text-primary);
             font-size: 2.25rem;
             font-weight: bold;
             margin-bottom: 0.5rem;
         }
-        .kpi-change-up { color: var(--accent-color); }
-        .kpi-change-down { color: var(--danger-color); }
-        .sheet-tab-active { background-color: var(--primary-color); color: var(--text-primary); }
-        .sheet-tab-inactive { background-color: var(--border-color); color: var(--text-secondary); }
-        .time-range-button, .composition-ip-button {
+
+        .kpi-change-up {
+            color: var(--accent-color);
+        }
+
+        .kpi-change-down {
+            color: var(--danger-color);
+        }
+
+        .sheet-tab-active {
+            background-color: var(--primary-color);
+            color: var(--text-primary);
+        }
+
+        .sheet-tab-inactive {
+            background-color: var(--border-color);
+            color: var(--text-secondary);
+        }
+        
+        .time-range-button,
+        .composition-ip-button {
              border: none;
              background: none;
              color: inherit;
              font-size: inherit;
              cursor: pointer;
         }
-        .time-range-button:focus, .composition-ip-button:focus {
+        
+        .time-range-button:focus,
+        .composition-ip-button:focus {
             outline: 2px solid var(--primary-color);
             outline-offset: 2px;
         }
-        .chart-container { position: relative; height: 300px; width: 100%; }
-        .compact-chart-container { position: relative; height: 250px; width: 100%; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .compact-chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+
         .metric-radio:checked+label {
             background-color: var(--primary-color);
             color: white;
         }
-        .kpi-row { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; }
-        .kpi-row .card { flex: 1; min-width: calc(16.666% - 1.5rem); }
-        .sheet-content { display: none; }
-        .sheet-content.active { display: block; }
-        .table-header { background-color: var(--border-color); }
-        .ip-contribution-table th, .ip-contribution-table td { padding: 12px 15px; text-align: right; }
-        .ip-contribution-table th:first-child, .ip-contribution-table td:first-child { text-align: left; }
-        .ip-comparison-table th, .ip-comparison-table td { padding: 12px 15px; text-align: right; }
-        .ip-comparison-table th:first-child, .ip-comparison-table td:first-child { text-align: left; }
-        .metric-value { font-weight: bold; font-size: 1.1rem; }
-        .metric-percentage { font-size: 0.85rem; color: var(--text-secondary); }
-        .metric-change { font-size: 0.85rem; }
-        .metric-change-up { color: var(--accent-color); }
-        .metric-change-down { color: var(--danger-color); }
+
+        .kpi-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-row .card {
+            flex: 1;
+            min-width: calc(16.666% - 1.5rem);
+        }
+
+        .sheet-content {
+            display: none;
+        }
+
+        .sheet-content.active {
+            display: block;
+        }
+
+        .table-header {
+            background-color: var(--border-color);
+        }
+
+        .ip-contribution-table th,
+        .ip-contribution-table td {
+            padding: 12px 15px;
+            text-align: right;
+        }
+
+        .ip-contribution-table th:first-child,
+        .ip-contribution-table td:first-child {
+            text-align: left;
+        }
+
+        .ip-comparison-table th,
+        .ip-comparison-table td {
+            padding: 12px 15px;
+            text-align: right;
+        }
+
+        .ip-comparison-table th:first-child,
+        .ip-comparison-table td:first-child {
+            text-align: left;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .metric-percentage {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .metric-change {
+            font-size: 0.85rem;
+        }
+
+        .metric-change-up {
+            color: var(--accent-color);
+        }
+
+        .metric-change-down {
+            color: var(--danger-color);
+        }
+
+        .table-section {
+            margin-bottom: 2rem;
+        }
+
+        .table-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
         .chart-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
             margin-bottom: 1.5rem;
         }
+
         .chart-card {
             background-color: var(--card-bg);
             border-radius: 0.75rem;
@@ -126,7 +296,14 @@
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        .chart-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 1rem; text-align: center; }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
         .ceo-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -135,6 +312,7 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 1rem;
         }
+
         .ceo-tab {
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
@@ -145,7 +323,13 @@
             color: inherit;
             font-size: inherit;
         }
-        .ceo-tab:focus { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+        .ceo-tab:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        /* --- Styles for TVBS Section --- */
         .analysis-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -154,6 +338,7 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 1rem;
         }
+
         .analysis-tab {
             padding: 0.5rem 1rem;
             border-radius: 0.5rem;
@@ -164,9 +349,20 @@
             color: inherit;
             font-size: inherit;
         }
-        .analysis-tab:focus { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-        .analysis-content { display: none; }
-        .analysis-content.active { display: block; }
+
+        .analysis-tab:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        .analysis-content {
+            display: none;
+        }
+
+        .analysis-content.active {
+            display: block;
+        }
+
         .filter-section {
             background-color: var(--card-bg);
             border-radius: 0.5rem;
@@ -174,9 +370,25 @@
             margin-bottom: 1.5rem;
             border: 1px solid var(--border-color);
         }
-        .dropdown-row { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; }
-        .dropdown-filter { display: flex; flex-direction: column; gap: 0.5rem; }
-        .filter-label { font-size: 0.875rem; color: var(--text-secondary); }
+
+        .dropdown-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-end;
+        }
+
+        .dropdown-filter {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
         .dropdown-select {
             background-color: var(--border-color);
             color: var(--text-primary);
@@ -186,6 +398,7 @@
             font-size: 0.875rem;
             min-width: 150px;
         }
+
         .section-title {
             font-size: 1.5rem;
             font-weight: bold;
@@ -193,34 +406,66 @@
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border-color);
         }
+
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
+
         .metric-card {
             background-color: var(--card-bg);
             border-radius: 0.5rem;
             padding: 1rem;
             border: 1px solid var(--border-color);
         }
-        .metric-title { color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem; }
-        .metric-grid .metric-value { font-size: 1.25rem; font-weight: bold; margin-bottom: 0.25rem; }
-        .metric-grid .metric-percentage { font-size: 0.75rem; }
+
+        .metric-title {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .metric-grid .metric-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-grid .metric-percentage {
+            font-size: 0.75rem;
+        }
+
         .retention-analysis-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
             margin-bottom: 1.5rem;
         }
-        .retention-analysis-chart-container { position: relative; height: 250px; width: 100%; }
-        @media (max-width: 1024px) {
-            .kpi-row .card { min-width: calc(33.333% - 1.5rem); }
-            .chart-grid { grid-template-columns: 1fr; }
+
+        .retention-analysis-chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
         }
+
+
+        @media (max-width: 1024px) {
+            .kpi-row .card {
+                min-width: calc(33.333% - 1.5rem);
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
-            .dashboard-container { flex-direction: column; }
+            .dashboard-container {
+                flex-direction: column;
+            }
+
             .sidebar {
                 width: 100%;
                 border-right: none;
@@ -228,319 +473,1424 @@
                 height: auto;
                 position: relative;
             }
-            .nav-tabs { flex-direction: row; overflow-x: auto; padding-bottom: 0.5rem; }
-            .nav-tab { white-space: nowrap; }
-            .kpi-row .card { min-width: calc(50% - 1.5rem); }
+
+            .nav-tabs {
+                flex-direction: row;
+                overflow-x: auto;
+                padding-bottom: 0.5rem;
+            }
+
+            .nav-tab {
+                white-space: nowrap;
+            }
+
+            .kpi-row .card {
+                min-width: calc(50% - 1.5rem);
+            }
+
+            .ip-contribution-table,
+            .ip-comparison-table {
+                font-size: 0.875rem;
+            }
+
+            .ip-contribution-table th,
+            .ip-contribution-table td,
+            .ip-comparison-table th,
+            .ip-comparison-table td {
+                padding: 8px 10px;
+            }
+
+            .dropdown-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .dropdown-select {
+                min-width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .kpi-row .card {
+                min-width: 100%;
+            }
+
+            .ceo-tabs {
+                flex-direction: column;
+            }
+
+            .analysis-tabs {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
+
 <body>
-<div class="dashboard-container">
-<nav class="sidebar">
-<div class="logo">集團數據儀表板</div>
-<div class="nav-tabs">
-<button class="nav-tab nav-tab-active" data-sheet="ceo-view">
-<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-<path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-</svg>
-TVBS會員總覽
-</button>
-<button class="nav-tab nav-tab-inactive" data-sheet="tvbs">
-<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-<path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
-</svg>
-TVBS新聞網
-</button>
-</div>
-</nav>
-<main class="main-content">
-<section id="ceo-view" class="sheet-content active">
-<h1 class="text-2xl font-semibold border-l-4 border-blue-500 pl-3 mb-6">TVBS會員總覽</h1>
-<div class="ceo-tabs">
-<button class="ceo-tab sheet-tab-active" data-ceo-tab="core">核心指標</button>
-<button class="ceo-tab sheet-tab-inactive" data-ceo-tab="composition">會員組成</button>
-</div>
-<div id="ceo-core" class="ceo-content active">
-<div class="flex items-center space-x-2 mb-4">
-<span class="font-medium text-sm text-gray-400">時間範圍:</span>
-<div>
-<button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-range="daily">每日</button>
-<button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-range="weekly">每週</button>
-<button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-active" data-range="monthly">每月</button>
-</div>
-</div>
-<div class="kpi-row">
-<div class="card">
-<p class="kpi-title">總瀏覽量 (PV)</p>
-<p class="kpi-value">146.8M</p>
-<div class="flex items-center font-medium kpi-change-down">
-<span>7.0%</span>
-<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
-</div>
-</div>
-<div class="card">
-<p class="kpi-title">活躍會員數</p>
-<p class="kpi-value">26.6M</p>
-<div class="flex items-center font-medium kpi-change-down">
-<span>6.7%</span>
-<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
-</div>
-</div>
-<div class="card">
-<p class="kpi-title">人均訪問次數</p>
-<p class="kpi-value">3.27</p>
-<div class="flex items-center font-medium kpi-change-down">
-<span>4.1%</span>
-<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
-</div>
-</div>
-<div class="card">
-<p class="kpi-title">單次訪問頁數</p>
-<p class="kpi-value">1.69</p>
-<div class="flex items-center font-medium kpi-change-up">
-<span>4.3%</span>
-<span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
-</div>
-</div>
-</div>
-<div class="card mb-8">
-<div class="flex justify-between items-center mb-4">
-<h2 class="text-xl font-semibold">趨勢分析</h2>
-<div class="flex items-center space-x-2">
-<span class="font-medium text-sm">數據指標:</span>
-<div class="flex space-x-1">
-<input type="radio" id="metric-pv" name="metric" value="pv" class="metric-radio hidden" checked>
-<label for="metric-pv" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-blue-500 text-white">總瀏覽量</label>
-<input type="radio" id="metric-uu" name="metric" value="uu" class="metric-radio hidden">
-<label for="metric-uu" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-gray-700 text-gray-300">活躍會員數</label>
-</div>
-</div>
-</div>
-<div class="chart-container">
-<canvas id="ip-trend-chart"></canvas>
-</div>
-</div>
-</div>
-<div id="ceo-composition" class="ceo-content" hidden>
-<div class="flex justify-end items-center mb-4">
-<div class="flex items-center space-x-2">
-<span class="font-medium text-sm text-gray-400">IP 篩選:</span>
-<div class="flex flex-wrap gap-1">
-<button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-active" data-ip="overall">整體</button>
-<button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="tvbs">TVBS新聞網</button>
-<button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="health">健康2.0</button>
-</div>
-</div>
-</div>
-<div class="chart-grid">
-<div class="chart-card">
-<h3 class="chart-title">會員性別分布</h3>
-<div class="compact-chart-container">
-<canvas id="gender-chart"></canvas>
-</div>
-</div>
-<div class="chart-card">
-<h3 class="chart-title">會員年齡分布</h3>
-<div class="compact-chart-container">
-<canvas id="age-chart"></canvas>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section id="tvbs" class="sheet-content" hidden>
-<h1 class="text-2xl font-semibold border-l-4 border-blue-500 pl-3 mb-6">TVBS新聞網 詳細數據</h1>
-<div class="analysis-tabs">
-<button class="analysis-tab sheet-tab-active" data-analysis="acquisition">會員指標</button>
-<button class="analysis-tab sheet-tab-inactive" data-analysis="retention">留存指標</button>
-</div>
-<div id="tvbs-acquisition" class="analysis-content active">
-<h2 class="section-title">會員指標分析</h2>
-<div class="metric-grid">
-<div class="metric-card">
-<p class="metric-title">當月活躍會員數</p>
-<p class="metric-value">109,069</p>
-</div>
-<div class="metric-card">
-<p class="metric-title">當月新註冊會員數</p>
-<p class="metric-value">2,451</p>
-</div>
-</div>
-</div>
-<div id="tvbs-retention" class="analysis-content" hidden>
-<h2 class="section-title">留存指標分析</h2>
-<div class="metric-grid">
-<div class="metric-card">
-<p class="metric-title">七日留存率</p>
-<p class="metric-value">24.12%</p>
-</div>
-</div>
-</div>
-</section>
-</main>
-</div>
-<script>
-const chartInstances = new Map();
-let currentCeoTimeRange = 'monthly';
-let currentCeoMetric = 'pv';
+    <div class="dashboard-container">
+        <!-- 左側導航欄 -->
+        <nav class="sidebar" aria-label="主要導航">
+            <div class="logo">集團數據儀表板</div>
+            <div class="nav-tabs" role="tablist" aria-label="網站選擇">
+                
+                <button class="nav-tab nav-tab-active" role="tab" aria-selected="true" aria-controls="ceo-view" data-sheet="ceo-view" id="ceo-tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    TVBS會員總覽
+                </button>
+                
+                <button class="nav-tab nav-tab-inactive" role="tab" aria-selected="false" aria-controls="tvbs" data-sheet="tvbs" id="tvbs-tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                    </svg>
+                    TVBS新聞網
+                </button>
+                
+                <!-- 其他导航项 -->
+            </div>
+        </nav>
 
-const mockCeoData = {
-    monthly: {
-        kpi: { pv: "146.8M", uu: "26.6M", session_uu: "3.27", pv_session: "1.69" },
-        trend: {
-            labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
-            pv: [95, 98, 102, 105, 108, 112],
-            uu: [16.5, 16.8, 17.2, 17.5, 17.8, 18.2]
+        <main class="main-content">
+            
+            <!-- TVBS會員總覽 -->
+            <section id="ceo-view" class="sheet-content active" role="tabpanel" aria-labelledby="ceo-tab">
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <h1 class="text-2xl font-semibold border-l-4 border-blue-500 pl-3">TVBS會員總覽</h1>
+                </div>
+
+                <!-- TVBS會員總覽分頁 -->
+                <div class="ceo-tabs" role="tablist" aria-label="TVBS會員總覽分頁">
+                    <button class="ceo-tab sheet-tab-active" role="tab" aria-selected="true" aria-controls="ceo-core" data-ceo-tab="core">核心指標</button>
+                    <button class="ceo-tab sheet-tab-inactive" role="tab" aria-selected="false" aria-controls="ceo-composition" data-ceo-tab="composition">會員組成</button>
+                </div>
+
+                <!-- 核心指標內容 -->
+                <div id="ceo-core" class="ceo-content active" role="tabpanel" aria-labelledby="ceo-core-tab">
+                    
+                    <!-- 時間範圍篩選器 (已移動到 KPI 上方) -->
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-medium text-sm text-gray-400">時間範圍:</span>
+                            <div role="group" aria-label="選擇時間範圍">
+                                <button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-range="daily" aria-pressed="false">每日</button>
+                                <button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-range="weekly" aria-pressed="false">每週</button>
+                                <button class="time-range-button px-3 py-1.5 text-xs rounded-md sheet-tab-active" data-range="monthly" aria-pressed="true">每月</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 本期核心指標 (第一張卡片已移除時間範圍) -->
+                    <div class="kpi-row" role="region" aria-label="核心指標">
+                        <div class="card">
+                            <p class="kpi-title">總瀏覽量 (PV)</p>
+                            <p class="kpi-value">146.8M</p>
+                            <div class="flex items-center font-medium kpi-change-down">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                <span>7.0%</span>
+                                <span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <p class="kpi-title">活躍會員數</p>
+                            <p class="kpi-value">26.6M</p>
+                            <div class="flex items-center font-medium kpi-change-down">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                <span>6.7%</span>
+                                <span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <p class="kpi-title">人均訪問次數 (Session/UU)</p>
+                            <p class="kpi-value">3.27</p>
+                            <div class="flex items-center font-medium kpi-change-down">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                <span>4.1%</span>
+                                <span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <p class="kpi-title">單次訪問頁數 (PV/Session)</p>
+                            <p class="kpi-value">1.69</p>
+                            <div class="flex items-center font-medium kpi-change-up">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                <span>4.3%</span>
+                                <span class="text-xs text-gray-400 ml-1">(vs 上一期)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 趨勢分析圖表區塊 -->
+                    <div class="card mb-8" role="region" aria-label="趨勢分析">
+                        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                            <h2 class="text-xl font-semibold">趨勢分析</h2>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-medium text-sm">數據指標:</span>
+                                <div class="flex space-x-1" role="radiogroup" aria-label="選擇數據指標">
+                                    <input type="radio" id="metric-pv" name="metric" value="pv" class="metric-radio hidden" checked>
+                                    <label for="metric-pv" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-blue-500 text-white">總瀏覽量</label>
+                                    <input type="radio" id="metric-uu" name="metric" value="uu" class="metric-radio hidden">
+                                    <label for="metric-uu" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-gray-700 text-gray-300">活躍會員數</label>
+                                    <input type="radio" id="metric-session" name="metric" value="session" class="metric-radio hidden">
+                                    <label for="metric-session" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-gray-700 text-gray-300">人均訪問次數</label>
+                                    <input type="radio" id="metric-depth" name="metric" value="depth" class="metric-radio hidden">
+                                    <label for="metric-depth" class="px-3 py-1 text-xs rounded-md cursor-pointer bg-gray-700 text-gray-300">單次訪問頁數</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="ip-trend-chart" aria-label="趨勢圖表" role="img"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 各IP核心指標表格 (已更名) -->
+                    <div class="card mb-8" role="region" aria-label="各IP核心指標">
+                        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                            <h2 class="text-xl font-semibold">各IP核心指標</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left ip-comparison-table" aria-label="各IP核心指標表">
+                                <caption class="sr-only">各IP核心指標表，包含總瀏覽量、活躍會員數、人均訪問次數、單次訪問頁數等指標</caption>
+                                <thead>
+                                    <tr class="table-header">
+                                        <th scope="col" class="p-3">IP 名稱</th>
+                                        <th scope="col" class="p-3">總瀏覽量 (佔比) (vs.上一期)</th>
+                                        <th scope="col" class="p-3">活躍會員數 (佔比) (vs.上一期)</th>
+                                        <th scope="col" class="p-3">人均訪問次數 (vs.上一期)</th>
+                                        <th scope="col" class="p-3">單次訪問頁數 (vs.上一期)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">TVBS新聞網</th>
+                                        <td class="p-3">
+                                            <div class="metric-value">110.7M</div>
+                                            <div class="metric-percentage">74.9%</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                8.50%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">17.1M</div>
+                                            <div class="metric-percentage">64.3%</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                6.40%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">3.73</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                5.60%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">1.74</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                3.60%
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">健康2.0</th>
+                                        <td class="p-3">
+                                            <div class="metric-value">15.2M</div>
+                                            <div class="metric-percentage">10.4%</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                5.20%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">3.66M</div>
+                                            <div class="metric-percentage">13.8%</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                4.80%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">2.85</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                2.10%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">1.52</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                6.30%
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">食尚玩家</th>
+                                        <td class="p-3">
+                                            <div class="metric-value">12.8M</div>
+                                            <div class="metric-percentage">8.7%</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                12.50%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">3.70M</div>
+                                            <div class="metric-percentage">13.9%</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                8.30%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">3.12</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                4.20%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">1.68</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                5.70%
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">女人我最大</th>
+                                        <td class="p-3">
+                                            <div class="metric-value">5.4M</div>
+                                            <div class="metric-percentage">3.7%</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                3.20%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">2.16M</div>
+                                            <div class="metric-percentage">8.1%</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                1.80%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">2.45</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                4.50%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">1.38</div>
+                                            <div class="metric-change metric-change-down">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>
+                                                2.70%
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="p-3 font-medium">地球黃金線</th>
+                                        <td class="p-3">
+                                            <div class="metric-value">2.7M</div>
+                                            <div class="metric-percentage">1.8%</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                15.80%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">1.45M</div>
+                                            <div class="metric-percentage">5.5%</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                12.40%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">3.05</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                8.20%
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="metric-value">1.62</div>
+                                            <div class="metric-change metric-change-up">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>
+                                                7.50%
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 會員組成內容 -->
+                <div id="ceo-composition" class="ceo-content" role="tabpanel" aria-labelledby="ceo-composition-tab" hidden>
+                    
+                    <!-- 會員組成篩選器 (已修改為按鈕) -->
+                    <div class="flex flex-wrap justify-end items-center mb-4 gap-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-medium text-sm text-gray-400">IP 篩選:</span>
+                            <div role="group" aria-label="選擇IP" class="flex flex-wrap gap-1">
+                                <button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-active" data-ip="overall" aria-pressed="true">整體</button>
+                                <button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="tvbs" aria-pressed="false">TVBS新聞網</button>
+                                <button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="health" aria-pressed="false">健康2.0</button>
+                                <button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="food" aria-pressed="false">食尚玩家</button>
+                                <button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="woman" aria-pressed="false">女人我最大</button>
+                                <button class="composition-ip-button px-3 py-1.5 text-xs rounded-md sheet-tab-inactive" data-ip="gold" aria-pressed="false">地球黃金線</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 會員組成圖表 -->
+                    <div class="chart-grid">
+                        <div class="chart-card">
+                            <h3 class="chart-title">會員性別分布</h3>
+                            <div class="compact-chart-container">
+                                <canvas id="gender-chart" aria-label="會員性別分布圓餅圖" role="img"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3 class="chart-title">會員年齡分布</h3>
+                            <div class="compact-chart-container">
+                                <canvas id="age-chart" aria-label="會員年齡分布圓餅圖" role="img"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3 class="chart-title">會員地區分布</h3>
+                            <div class="compact-chart-container">
+                                <canvas id="region-chart" aria-label="會員地區分布圓餅圖" role="img"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3 class="chart-title">註冊來源分布</h3>
+                            <div class="compact-chart-container">
+                                <canvas id="registration-source-chart" aria-label="註冊來源分布圓餅圖" role="img"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 各IP會員資料完整度 -->
+                    <div class="card" role="region" aria-label="各IP會員資料完整度">
+                        <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                            <h2 class="text-xl font-semibold">各IP會員資料完整度</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left ip-contribution-table" aria-label="各IP會員資料完整度表">
+                                <caption class="sr-only">各IP會員資料完整度表，包含註冊會員數、email數、phone數、birthday數、gender數、google_id數、apple_id數、fb_id數、line_id數等指標</caption>
+                                <thead>
+                                    <tr class="table-header">
+                                        <th scope="col" class="p-3">IP 名稱</th>
+                                        <th scope="col" class="p-3">註冊會員數</th>
+                                        <th scope="col" class="p-3">email數 (佔比)</th>
+                                        <th scope="col" class="p-3">phone數 (佔比)</th>
+                                        <th scope="col" class="p-3">birthday數 (佔比)</th>
+                                        <th scope="col" class="p-3">gender數 (佔比)</th>
+                                        <th scope="col" class="p-3">google_id數 (佔比)</th>
+                                        <th scope="col" class="p-3">apple_id數 (佔比)</th>
+                                        <th scope="col" class="p-3">fb_id數 (佔比)</th>
+                                        <th scope="col" class="p-3">line_id數 (佔比)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">TVBS新聞網</th>
+                                        <td class="p-3 font-semibold">18,569</td>
+                                        <td class="p-3">18,569 <span class="text-xs text-gray-400 ml-1">(74.9%)</span></td>
+                                        <td class="p-3">936 <span class="text-xs text-gray-400 ml-1">(49.7%)</span></td>
+                                        <td class="p-3">8,612 <span class="text-xs text-gray-400 ml-1">(39.8%)</span></td>
+                                        <td class="p-3">16,000 <span class="text-xs text-gray-400 ml-1">(30.4%)</span></td>
+                                        <td class="p-3">8,931 <span class="text-xs text-gray-400 ml-1">(24.0%)</span></td>
+                                        <td class="p-3">3,365 <span class="text-xs text-gray-400 ml-1">(15.8%)</span></td>
+                                        <td class="p-3">4,286 <span class="text-xs text-gray-400 ml-1">(19.9%)</span></td>
+                                        <td class="p-3">25,000 <span class="text-xs text-gray-400 ml-1">(29.8%)</span></td>
+                                    </tr>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">健康2.0</th>
+                                        <td class="p-3 font-semibold">51,165</td>
+                                        <td class="p-3">51,165 <span class="text-xs text-gray-400 ml-1">(79.2%)</span></td>
+                                        <td class="p-3">2,091 <span class="text-xs text-gray-400 ml-1">(49.2%)</span></td>
+                                        <td class="p-3">34,504 <span class="text-xs text-gray-400 ml-1">(41.0%)</span></td>
+                                        <td class="p-3">50,000 <span class="text-xs text-gray-400 ml-1">(32.8%)</span></td>
+                                        <td class="p-3">10,407 <span class="text-xs text-gray-400 ml-1">(24.6%)</span></td>
+                                        <td class="p-3">6,961 <span class="text-xs text-gray-400 ml-1">(16.4%)</span></td>
+                                        <td class="p-3">25,168 <span class="text-xs text-gray-400 ml-1">(19.1%)</span></td>
+                                        <td class="p-3">1,1000 <span class="text-xs text-gray-400 ml-1">(30.1%)</span></td>
+                                    </tr>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">食尚玩家</th>
+                                        <td class="p-3 font-semibold">716,797</td>
+                                        <td class="p-3">716,797 <span class="text-xs text-gray-400 ml-1">(75.7%)</span></td>
+                                        <td class="p-3">174,656 <span class="text-xs text-gray-400 ml-1">(51.4%)</span></td>
+                                        <td class="p-3">620,888 <span class="text-xs text-gray-400 ml-1">(43.2%)</span></td>
+                                        <td class="p-3">620,000 <span class="text-xs text-gray-400 ml-1">(35.1%)</span></td>
+                                        <td class="p-3">131,259 <span class="text-xs text-gray-400 ml-1">(27.0%)</span></td>
+                                        <td class="p-3">77,713 <span class="text-xs text-gray-400 ml-1">(18.9%)</span></td>
+                                        <td class="p-3">411,683 <span class="text-xs text-gray-400 ml-1">(21.6%)</span></td>
+                                        <td class="p-3">15,000 <span class="text-xs text-gray-400 ml-1">(32.4%)</span></td>
+                                    </tr>
+                                    <tr class="border-b border-gray-700">
+                                        <th scope="row" class="p-3 font-medium">女人我最大</th>
+                                        <td class="p-3 font-semibold">342,469</td>
+                                        <td class="p-3">342,469 <span class="text-xs text-gray-400 ml-1">(78.7%)</span></td>
+                                        <td class="p-3">61,557 <span class="text-xs text-gray-400 ml-1">(50.9%)</span></td>
+                                        <td class="p-3">330,505 <span class="text-xs text-gray-400 ml-1">(41.7%)</span></td>
+                                        <td class="p-3">61,200 <span class="text-xs text-gray-400 ml-1">(37.0%)</span></td>
+                                        <td class="p-3">17,646 <span class="text-xs text-gray-400 ml-1">(23.1%)</span></td>
+                                        <td class="p-3">17,646 <span class="text-xs text-gray-400 ml-1">(13.9%)</span></td>
+                                        <td class="p-3">191,802 <span class="text-xs text-gray-400 ml-1">(18.5%)</span></td>
+                                        <td class="p-3">12,000 <span class="text-xs text-gray-400 ml-1">(32.4%)</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row" class="p-3 font-medium">地球黃金線</th>
+                                        <td class="p-3 font-semibold">32,863</td>
+                                        <td class="p-3">32,863 <span class="text-xs text-gray-400 ml-1">(75.9%)</span></td>
+                                        <td class="p-3">188 <span class="text-xs text-gray-400 ml-1">(48.3%)</span></td>
+                                        <td class="p-3">32,844 <span class="text-xs text-gray-400 ml-1">(41.4%)</span></td>
+                                        <td class="p-3">32,000 <span class="text-xs text-gray-400 ml-1">(34.5%)</span></td>
+                                        <td class="p-3">2,000 <span class="text-xs text-gray-400 ml-1">(27.6%)</span></td>
+                                        <td class="p-3">218 <span class="text-xs text-gray-400 ml-1">(13.8%)</span></td>
+                                        <td class="p-3">29,483 <span class="text-xs text-gray-400 ml-1">(20.7%)</span></td>
+                                        <td class="p-3">10,000 <span class="text-xs text-gray-400 ml-1">(34.5%)</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TVBS新聞網分頁 -->
+            <section id="tvbs" class="sheet-content" role="tabpanel" aria-labelledby="tvbs-tab" hidden>
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <h1 class="text-2xl font-semibold border-l-4 border-blue-500 pl-3">TVBS新聞網 詳細數據</h1>
+                </div>
+
+                <!-- 分析主題分頁 - 增加新指標 -->
+                <div class="analysis-tabs" role="tablist" aria-label="分析主題">
+                    <button class="analysis-tab sheet-tab-active" role="tab" aria-selected="true" aria-controls="tvbs-acquisition" data-analysis="acquisition">會員指標</button>
+                    <button class="analysis-tab sheet-tab-inactive" role="tab" aria-selected="false" aria-controls="tvbs-retention" data-analysis="retention">留存指標</button>
+                    <button class="analysis-tab sheet-tab-inactive" role="tab" aria-selected="false" aria-controls="tvbs-engagement" data-analysis="engagement">互動指標</button>
+                    <button class="analysis-tab sheet-tab-inactive" role="tab" aria-selected="false" aria-controls="tvbs-activation" data-analysis="activation">價值指標</button>
+                </div>
+
+                <!-- 篩選器區塊 -->
+                <div class="filter-section">
+                    <div class="dropdown-row">
+                        <div class="dropdown-filter">
+                            <div class="filter-label">平台</div>
+                            <select class="dropdown-select" id="tvbs-platform-select">
+                                <option value="overall">整體</option>
+                                <option value="web">WEB</option>
+                                <option value="app">APP</option>
+                            </select>
+                        </div>
+                        <div class="dropdown-filter">
+                            <div class="filter-label">用戶</div>
+                            <select class="dropdown-select" id="tvbs-user-type-select">
+                                <option value="active">整體</option>
+                                <option value="newmember">新註冊會員</option>
+                                <option value="returningmember">回訪會員</option>
+                                <option value="tLevel">T級用戶</option>
+                                <option value="bone">保骨用戶</option>
+                                <option value="luxury">輕奢用戶</option>
+                            </select>
+                        </div>
+                        <div class="dropdown-filter">
+                            <div class="filter-label">來源</div>
+                            <select class="dropdown-select" id="tvbs-source-select">
+                                <option value="overall">整體</option>
+                                <option value="search">Search</option>
+                                <option value="direct">Direct</option>
+                                <option value="fb">FB</option>
+                                <option value="line">Line</option>
+                                <option value="cross">Cross IP</option>
+                                <option value="others">Others</option>
+                            </select>
+                        </div>
+                        <div class="dropdown-filter">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm" id="tvbs-apply-filters">
+                                套用篩選
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 會員成長指標內容 -->
+                <div id="tvbs-acquisition" class="analysis-content active" role="tabpanel" aria-labelledby="tvbs-acquisition-tab">
+                    <h2 class="section-title">會員指標分析</h2>
+                    <!-- 會員成長核心指標 -->
+                    <div class="metric-grid" role="region" aria-label="會員核心指標">
+                        <div class="metric-card">
+                            <p class="metric-title">當月活躍會員數</p>
+                            <p class="metric-value">109,069</p>
+                            <div class="metric-percentage">
+                                <span>9.15%</span>
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -19.3%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">當月新註冊會員數</p>
+                            <p class="metric-value">2,451</p>
+                            <div class="metric-percentage">
+                                <span>0.15%</span>
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-down">(vs 上一期 +274.2%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">當月回訪會員數</p>
+                            <p class="metric-value">106,618</p>
+                            <div class="metric-percentage">
+                                <span>9.00%</span>
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -20.3%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">新註冊會員佔比</p>
+                            <p class="metric-value">1.65％</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 +239.9%)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-grid">
+                        <!-- 會員成長趨勢分析 -->
+                        <div class="card" role="region" aria-label="會員趨勢分析">
+                            <h3 class="text-lg font-semibold mb-4">會員趨勢分析</h3>
+                            <div class="chart-container">
+                                <canvas id="acquisition-trend-chart" aria-label="會員趨勢分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                        <!-- 來源媒介分析 -->
+                        <div class="card" role="region" aria-label="來源趨勢折線圖">
+                            <h3 class="text-lg font-semibold mb-4">來源趨勢折線圖</h3>
+                            <div class="chart-container">
+                                <canvas id="acquisition-source-chart" aria-label="來源趨勢折線圖" role="img"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 留存指標內容 -->
+                <div id="tvbs-retention" class="analysis-content" role="tabpanel" aria-labelledby="tvbs-retention-tab" hidden>
+                    <h2 class="section-title">留存指標分析</h2>
+                    <!-- 留存核心指標 -->
+                    <div class="metric-grid" role="region" aria-label="留存核心指標">
+                        <div class="metric-card">
+                            <p class="metric-title">人均訪問次數 (Session/UU)</p>
+                            <p class="metric-value">2.89</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -9.61%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">七日留存率</p>
+                            <p class="metric-value">24.12%</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -13.21%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">日活躍用戶 (DAU)</p>
+                            <p class="metric-value">163,737</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -24.22%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">WAU/MAU</p>
+                            <p class="metric-value">0.22%</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -19.39%)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 留存分析圖表 (更新為 2x2 網格) -->
+                    <div class="retention-analysis-grid">
+                       <div class="card">
+                            <h3 class="text-lg font-semibold mb-4">人均訪問次數趨勢</h3>
+                            <div class="retention-analysis-chart-container">
+                                <canvas id="session-uu-trend-chart" aria-label="人均訪問次數趨勢圖" role="img"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3 class="text-lg font-semibold mb-4">會員七日留存曲線</h3>
+                            <div class="retention-analysis-chart-container">
+                                <canvas id="seven-day-retention-chart" aria-label="七日留存曲線圖" role="img"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3 class="text-lg font-semibold mb-4">會員活躍週期趨勢</h3>
+                            <div class="retention-analysis-chart-container">
+                                <canvas id="dau-mau-trend-chart" aria-label="會員活躍週期趨勢圖" role="img"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3 class="text-lg font-semibold mb-4">Session分布趨勢</h3>
+                            <div class="retention-analysis-chart-container">
+                                <canvas id="session-mau-trend-chart" aria-label="Session分布趨勢圖" role="img"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 留存率詳細數據 (此區塊已移除) -->
+                    
+                </div>
+                
+                <!-- 互動指標內容 -->
+                <div id="tvbs-engagement" class="analysis-content" role="tabpanel" aria-labelledby="tvbs-engagement-tab" hidden>
+                    <h2 class="section-title">互動指標分析</h2>
+                    <!-- 互動核心指標 -->
+                    <div class="metric-grid" role="region" aria-label="互動核心指標">
+                        <div class="metric-card">
+                            <p class="metric-title">單次訪問頁數(PV/Session)</p>
+                            <p class="metric-value">1.13</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 +20.2%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">跳出率(Bounce Rate)</p>
+                            <p class="metric-value">32.9%</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -11.0%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">平均單次訪問時長</p>
+                            <p class="metric-value">1:27</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 +28.3%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">文章/功能點擊事件數佔比</p>
+                            <p class="metric-value">11.19%</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -3.8%)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-grid">
+                        <!-- 互動趨勢分析 -->
+                        <div class="card" role="region" aria-label="互動趨勢分析">
+                            <h3 class="text-lg font-semibold mb-4">互動指標趨勢分析</h3>
+                            <div class="chart-container">
+                                <canvas id="engagement-trend-chart" aria-label="互動趨勢分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                        <!-- 互動行為分析 -->
+                        <div class="card" role="region" aria-label="互動行為分析">
+                            <h3 class="text-lg font-semibold mb-4">會員互動行為分析</h3>
+                            <div class="chart-container">
+                                <canvas id="engagement-behavior-chart" aria-label="互動行為分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 價值指標內容 -->
+                <div id="tvbs-activation" class="analysis-content" role="tabpanel" aria-labelledby="tvbs-activation-tab" hidden>
+                    <h2 class="section-title">價值指標分析</h2>
+                    <!-- 價值核心指標 -->
+                    <div class="metric-grid" role="region" aria-label="價值核心指標">
+                        <div class="metric-card">
+                            <p class="metric-title">APP下載數</p>
+                            <p class="metric-value">1.53M</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 +0.72%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">APP內會員轉化率</p>
+                            <p class="metric-value">42.3%</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 +3.2%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">會員登入率</p>
+                            <p class="metric-value">2.7%</p>
+                            <div class="metric-percentage">
+                                <span class="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 +4.0%)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <p class="metric-title">平均CAI</p>
+                            <p class="metric-value">-0.11</p>
+                            <div class="metric-percentage">
+                                <span class_name="text-xs text-gray-400 ml-1 kpi-change-up">(vs 上一期 -9.1%)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-grid">
+                        <!-- 價值漏斗分析 -->
+                        <div class="card" role="region" aria-label="價值漏斗分析">
+                            <h3 class="text-lg font-semibold mb-4">會員價值漏斗分析</h3>
+                            <div class="chart-container">
+                                <canvas id="activation-funnel-chart" aria-label="價值漏斗分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                        <!-- APP下載趨勢分析 -->
+                        <div class="card" role="region" aria-label="價值趨勢分析">
+                            <h3 class="text-lg font-semibold mb-4">APP下載趨勢分析</h3>
+                            <div class="chart-container">
+                                <canvas id="appdownload-trend-chart" aria-label="APP下載趨勢分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                        <!-- CAI趨勢分析 -->
+                        <div class="card" role="region" aria-label="CAI趨勢分析">
+                            <h3 class="text-lg font-semibold mb-4">CAI分群趨勢分析</h3>
+                            <div class="chart-container">
+                                <canvas id="cai-trend-chart" aria-label="CAI趨勢分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                        <!-- 價值趨勢分析 -->
+                        <div class="card" role="region" aria-label="價值趨勢分析">
+                            <h3 class="text-lg font-semibold mb-4">價值指標趨勢分析</h3>
+                            <div class="chart-container">
+                                <canvas id="activation-trend-chart" aria-label="價值趨勢分析圖表" role="img"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script>
+        // 圖表實例存儲
+        const chartInstances = new Map();
+
+        // --- 模擬數據 (CEO 總覽) ---
+        const mockCeoData = {
+            daily: {
+                kpi: { pv: "5.1M", uu: "1.2M", session_uu: "4.25", pv_session: "1.85" },
+                trend: {
+                    labels: Array.from({length: 30}, (_, i) => `10/${i + 1}`), // 模擬 30 天日期
+                    pv: Array.from({length: 30}, () => Math.random() * 2 + 4),
+                    uu: Array.from({length: 30}, () => Math.random() * 0.5 + 1),
+                    session: Array.from({length: 30}, () => Math.random() * 0.5 + 4),
+                    depth: Array.from({length: 30}, () => Math.random() * 0.2 + 1.8)
+                },
+                ipTable: [
+                    { ip: 'TVBS新聞網', pv: "3.8M (74.5%)", pv_change: "+1.2%", uu: "0.8M (66.7%)", uu_change: "+0.5%", su: "4.50", su_change: "+0.1%", ps: "1.90", ps_change: "+0.5%" },
+                    { ip: '健康2.0', pv: "0.5M (9.8%)", pv_change: "-0.5%", uu: "0.15M (12.5%)", uu_change: "+1.1%", su: "3.10", su_change: "-0.3%", ps: "1.65", ps_change: "+0.2%" },
+                    { ip: '食尚玩家', pv: "0.4M (7.8%)", pv_change: "+2.0%", uu: "0.1M (8.3%)", uu_change: "+1.5%", su: "3.20", su_change: "+0.2%", ps: "1.70", ps_change: "+0.1%" },
+                    { ip: '女人我最大', pv: "0.2M (3.9%)", pv_change: "-1.1%", uu: "0.08M (6.7%)", uu_change: "-0.8%", su: "2.50", su_change: "0.0%", ps: "1.40", ps_change: "-0.5%" },
+                    { ip: '地球黃金線', pv: "0.2M (3.9%)", pv_change: "+3.0%", uu: "0.07M (5.8%)", uu_change: "+2.5%", su: "2.80", su_change: "+0.4%", ps: "1.60", ps_change: "+0.3%" }
+                ]
+            },
+            weekly: {
+                kpi: { pv: "35.2M", uu: "8.5M", session_uu: "4.14", pv_session: "1.80" },
+                trend: {
+                    labels: Array.from({length: 12}, (_, i) => `W${i + 40}`), // 模擬 12 週
+                    pv: Array.from({length: 12}, () => Math.random() * 10 + 30),
+                    uu: Array.from({length: 12}, () => Math.random() * 2 + 7),
+                    session: Array.from({length: 12}, () => Math.random() * 0.5 + 4),
+                    depth: Array.from({length: 12}, () => Math.random() * 0.2 + 1.7)
+                },
+                ipTable: [
+                     { ip: 'TVBS新聞網', pv: "26.0M (73.9%)", pv_change: "+0.8%", uu: "5.8M (68.2%)", uu_change: "+0.2%", su: "4.30", su_change: "+0.3%", ps: "1.85", ps_change: "+0.2%" },
+                     { ip: '健康2.0', pv: "3.7M (10.5%)", pv_change: "+1.5%", uu: "1.1M (12.9%)", uu_change: "+0.8%", su: "3.00", su_change: "+0.1%", ps: "1.62", ps_change: "0.0%" },
+                     { ip: '食尚玩家', pv: "3.0M (8.5%)", pv_change: "+1.2%", uu: "0.8M (9.4%)", uu_change: "+0.5%", su: "3.15", su_change: "0.0%", ps: "1.65", ps_change: "+0.3%" },
+                     { ip: '女人我最大', pv: "1.3M (3.7%)", pv_change: "-0.6%", uu: "0.4M (4.7%)", uu_change: "-0.3%", su: "2.60", su_change: "-0.1%", ps: "1.39", ps_change: "+0.1%" },
+                     { ip: '地球黃金線', pv: "1.2M (3.4%)", pv_change: "+2.1%", uu: "0.4M (4.7%)", uu_change: "+1.0%", su: "2.90", su_change: "+0.2%", ps: "1.61", ps_change: "+0.1%" }
+                ]
+            },
+            monthly: {
+                kpi: { pv: "146.8M", uu: "26.6M", session_uu: "3.27", pv_session: "1.69" },
+                trend: {
+                    labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                    pv: [95, 98, 102, 105, 108, 112, 115, 110, 108, 112, 115, 111],
+                    uu: [16.5, 16.8, 17.2, 17.5, 17.8, 18.2, 18.5, 17.2, 16.8, 17.2, 17.5, 17.1],
+                    session: [3.1, 3.2, 3.2, 3.3, 3.4, 3.5, 3.4, 3.3, 3.2, 3.3, 3.4, 3.3],
+                    depth: [1.6, 1.6, 1.7, 1.7, 1.7, 1.8, 1.8, 1.7, 1.7, 1.8, 1.8, 1.7]
+                },
+                ipTable: [
+                    { ip: 'TVBS新聞網', pv: "110.7M (74.9%)", pv_change: "-8.50%", uu: "17.1M (64.3%)", uu_change: "-6.40%", su: "3.73", su_change: "-5.60%", ps: "1.74", ps_change: "+3.60%" },
+                    { ip: '健康2.0', pv: "15.2M (10.4%)", pv_change: "+5.20%", uu: "3.66M (13.8%)", uu_change: "+4.80%", su: "2.85", su_change: "-2.10%", ps: "1.52", ps_change: "+6.30%" },
+                    { ip: '食尚玩家', pv: "12.8M (8.7%)", pv_change: "+12.50%", uu: "3.70M (13.9%)", uu_change: "+8.30%", su: "3.12", su_change: "+4.20%", ps: "1.68", ps_change: "+5.70%" },
+                    { ip: '女人我最大', pv: "5.4M (3.7%)", pv_change: "-3.20%", uu: "2.16M (8.1%)", uu_change: "-1.80%", su: "2.45", su_change: "-4.50%", ps: "1.38", ps_change: "-2.70%" },
+                    { ip: '地球黃金線', pv: "2.7M (1.8%)", pv_change: "+15.80%", uu: "1.45M (5.5%)", uu_change: "+12.40%", su: "3.05", su_change: "+8.20%", ps: "1.62", ps_change: "+7.50%" }
+                ]
+            }
+        };
+
+        // --- 模擬數據 (會員組成) ---
+        const mockCompositionData = {
+            overall: {
+                gender: { data: [52, 45, 3], labels: ['男性', '女性', '其他'] },
+                age: { data: [15, 32, 28, 18, 7], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] },
+                region: { data: [45, 22, 28, 3, 2], labels: ['北部', '中部', '南部', '東部', '離島'] },
+                registration: { data: [2, 3, 62, 29, 2], labels: ['網新', '健康', '食尚', '女大', '黃金線'] }
+            },
+            tvbs: {
+                gender: { data: [55, 42, 3], labels: ['男性', '女性', '其他'] },
+                age: { data: [18, 35, 25, 15, 7], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] },
+                region: { data: [50, 20, 25, 3, 2], labels: ['北部', '中部', '南部', '東部', '離島'] },
+                registration: { data: [60, 5, 15, 10, 10], labels: ['網新', '健康', '食尚', '女大', '黃金線'] }
+            },
+            health: {
+                gender: { data: [45, 53, 2], labels: ['男性', '女性', '其他'] },
+                age: { data: [10, 25, 30, 25, 10], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] },
+                region: { data: [40, 25, 30, 3, 2], labels: ['北部', '中部', '南部', '東部', '離島'] },
+                registration: { data: [5, 60, 10, 15, 10], labels: ['網新', '健康', '食尚', '女大', '黃金線'] }
+            },
+            food: {
+                gender: { data: [48, 50, 2], labels: ['男性', '女性', '其他'] },
+                age: { data: [20, 40, 25, 10, 5], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] },
+                region: { data: [42, 28, 25, 3, 2], labels: ['北部', '中部', '南部', '東部', '離島'] },
+                registration: { data: [5, 5, 70, 10, 10], labels: ['網新', '健康', '食尚', '女大', '黃金線'] }
+            },
+            woman: {
+                gender: { data: [35, 63, 2], labels: ['男性', '女性', '其他'] },
+                age: { data: [15, 30, 35, 15, 5], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] },
+                region: { data: [48, 20, 27, 3, 2], labels: ['北部', '中部', '南部', '東部', '離島'] },
+                registration: { data: [5, 5, 10, 70, 10], labels: ['網新', '健康', '食尚', '女大', '黃金線'] }
+            },
+            gold: {
+                gender: { data: [60, 38, 2], labels: ['男性', '女性', '其他'] },
+                age: { data: [10, 28, 32, 20, 10], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] },
+                region: { data: [46, 24, 25, 3, 2], labels: ['北部', '中部', '南部', '東部', '離島'] },
+                registration: { data: [5, 5, 10, 10, 70], labels: ['網新', '健康', '食尚', '女大', '黃金線'] }
+            }
+        };
+
+        // --- 模擬數據 (用於 TVBS 新聞網分頁) ---
+        const mockData = {
+            labels: ['4月', '5月', '6月', '7月', '8月', '9月'],
+            acquisitionTrend: {
+                active: [10.5, 10.8, 11.2, 11.5, 12.0, 12.2],
+                new: [1.2, 1.3, 1.4, 1.6, 1.7, 1.5]
+            },
+            acquisitionSource: {
+                labels: ['Search', 'Direct', 'FB', 'Line', 'Cross IP', 'Others'],
+                data: [35, 22, 18, 12, 8, 5]
+            },
+            acquisitionSourceTrend: {
+                labels: ['4月', '5月', '6月', '7月', '8月', '9月'],
+                search: [30, 32, 33, 35, 34, 35],
+                direct: [20, 21, 22, 23, 22, 22],
+                fb: [20, 19, 18, 17, 16, 18]
+            },
+            retention7Day: {
+                labels: ['第1天', '第2天', '第3天', '第4天', '第5天', '第6天', '第7天'],
+                data: [100, 55.8, 42.5, 38.5, 30.1, 28.3, 25.4]
+            },
+            dauMauTrend: {
+                dauMau: [14.1, 14.5, 14.8, 15.0, 15.1, 15.3],
+                wauMau: [42.1, 42.5, 43.8, 44.0, 44.5, 45.2]
+            },
+            sessionUuTrend: {
+                labels: ['4月', '5月', '6月', '7月', '8月', '9月'],
+                data: [2.1, 2.0, 2.2, 2.1, 2.3, 2.2]
+            },
+            caiDistribution: {
+                labels: ['疏離', '流失', '穩定', '接近', '積極用戶'],
+                data: [15, 10, 40, 20, 15]
+            },
+            sessionDistributionTrend: {
+                labels: ['4月', '5月', '6月', '7月', '8月', '9月'],
+                s1: [40, 38, 35, 33, 30, 28],
+                s2_3: [30, 32, 33, 34, 35, 36],
+                s4_9: [20, 22, 24, 25, 26, 27],
+                s10plus: [10, 8, 8, 8, 9, 9]
+            },
+            engagementBehavior: {
+                labels: ['文章觀看', '影音觀看', '搖一搖', '優惠券', '策展/活動'],
+                data: [85, 45, 12, 8, 15]
+            },
+            engagementTrend: {
+                dau: [2.5, 2.6, 2.7, 2.8, 2.9, 2.8],
+                mau: [16.5, 16.8, 17.0, 17.2, 17.5, 17.1]
+            },
+            activationFunnel: {
+                labels: ['下載APP', '完成註冊', '完成登入', '首次關鍵行為'],
+                data: [100, 68.5, 42.3, 35.8]
+            },
+            activationTrend: {
+                registration: [62.1, 63.5, 65.2, 66.0, 65.1, 68.5],
+                onboarding: [35.2, 36.8, 38.1, 39.0, 39.1, 42.3]
+            }
+        };
+        
+        // --- 狀態變數 ---
+        let currentCeoTimeRange = 'monthly';
+        let currentCeoMetric = 'pv';
+
+        // 繪製或銷毀圖表
+        function renderChart(canvasId, type, data, options) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            if (chartInstances.has(canvasId)) {
+                chartInstances.get(canvasId).destroy();
+            }
+            
+            const chart = new Chart(ctx, { type, data, options });
+            chartInstances.set(canvasId, chart);
         }
-    }
-};
 
-const mockCompositionData = {
-    overall: {
-        gender: { data: [52, 45, 3], labels: ['男性', '女性', '其他'] },
-        age: { data: [15, 32, 28, 18, 7], labels: ['18-24歲', '25-34歲', '35-44歲', '45-54歲', '55歲以上'] }
-    }
-};
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化图表
+            initCharts();
 
-function renderChart(canvasId, type, data, options) {
-    const ctx = document.getElementById(canvasId);
-    if (!ctx) return;
-    if (chartInstances.has(canvasId)) chartInstances.get(canvasId).destroy();
-    const chart = new Chart(ctx, { type, data, options });
-    chartInstances.set(canvasId, chart);
-}
+            // --- 側邊欄導航 ---
+            const navTabs = document.querySelectorAll('.nav-tab');
+            const sheetContents = document.querySelectorAll('.sheet-content');
 
-const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { position: 'bottom', labels: { color: '#F9FAFB' } } },
-    scales: {
-        x: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } },
-        y: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } }
-    }
-};
+            navTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const sheetId = tab.getAttribute('data-sheet');
+                    
+                    navTabs.forEach(t => {
+                        t.classList.replace('nav-tab-active', 'nav-tab-inactive');
+                        t.setAttribute('aria-selected', 'false');
+                    });
+                    tab.classList.replace('nav-tab-inactive', 'nav-tab-active');
+                    tab.setAttribute('aria-selected', 'true');
 
-function initCharts() {
-    updateIPChart('ip-trend-chart', 'pv', 'monthly');
-    updateCompositionCharts('overall');
-}
-
-function updateIPChart(chartId, metric, timeRange) {
-    const data = mockCeoData[timeRange];
-    const datasets = metric === 'pv' ? data.trend.pv : data.trend.uu;
-    const label = metric === 'pv' ? '總瀏覽量' : '活躍會員數';
-    renderChart(chartId, 'line', {
-        labels: data.trend.labels,
-        datasets: [{
-            label: label,
-            data: datasets,
-            borderColor: '#3B82F6',
-            backgroundColor: '#3B82F620',
-            fill: true,
-            tension: 0.4
-        }]
-    }, chartOptions);
-}
-
-function updateCompositionCharts(ipFilter) {
-    const data = mockCompositionData[ipFilter] || mockCompositionData.overall;
-    const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#F9FAFB' } } } };
-    renderChart('gender-chart', 'doughnut', {
-        labels: data.gender.labels,
-        datasets: [{ data: data.gender.data, backgroundColor: ['#3B82F6', '#EC4899', '#6B7280'] }]
-    }, options);
-    renderChart('age-chart', 'doughnut', {
-        labels: data.age.labels,
-        datasets: [{ data: data.age.data, backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6'] }]
-    }, options);
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    initCharts();
-    
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const sheetId = tab.getAttribute('data-sheet');
-            document.querySelectorAll('.nav-tab').forEach(t => {
-                t.classList.replace('nav-tab-active', 'nav-tab-inactive');
-            });
-            tab.classList.replace('nav-tab-inactive', 'nav-tab-active');
-            document.querySelectorAll('.sheet-content').forEach(content => {
-                content.classList.remove('active');
-                content.setAttribute('hidden', 'true');
-            });
-            const activeContent = document.getElementById(sheetId);
-            if (activeContent) {
-                activeContent.classList.add('active');
-                activeContent.removeAttribute('hidden');
-            }
-        });
-    });
-    
-    document.querySelectorAll('.ceo-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const ceoTabType = tab.getAttribute('data-ceo-tab');
-            document.querySelectorAll('.ceo-tab').forEach(t => {
-                t.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
-            });
-            tab.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
-            document.querySelectorAll('.ceo-content').forEach(content => {
-                content.classList.remove('active');
-                content.setAttribute('hidden', 'true');
-            });
-            const activeContent = document.getElementById(`ceo-${ceoTabType}`);
-            if (activeContent) {
-                activeContent.classList.add('active');
-                activeContent.removeAttribute('hidden');
-            }
-        });
-    });
-    
-    document.querySelectorAll('.analysis-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const analysisType = tab.getAttribute('data-analysis');
-            document.querySelectorAll('.analysis-tab').forEach(t => {
-                t.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
-            });
-            tab.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
-            document.querySelectorAll('.analysis-content').forEach(content => {
-                content.classList.remove('active');
-                content.setAttribute('hidden', 'true');
-            });
-            const activeContent = document.getElementById(`tvbs-${analysisType}`);
-            if (activeContent) {
-                activeContent.classList.add('active');
-                activeContent.removeAttribute('hidden');
-            }
-        });
-    });
-    
-    document.querySelectorAll('.composition-ip-button').forEach(button => {
-        button.addEventListener('click', () => {
-            document.querySelectorAll('.composition-ip-button').forEach(btn => {
-                btn.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
-            });
-            button.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
-            const selectedIp = button.getAttribute('data-ip');
-            updateCompositionCharts(selectedIp);
-        });
-    });
-    
-    document.querySelectorAll('.metric-radio').forEach(radio => {
-        radio.addEventListener('change', function() {
-            if (this.checked) {
-                document.querySelectorAll('.metric-radio + label').forEach(label => {
-                    label.classList.remove('bg-blue-500', 'text-white');
-                    label.classList.add('bg-gray-700', 'text-gray-300');
+                    sheetContents.forEach(content => {
+                        content.classList.remove('active');
+                        content.setAttribute('hidden', 'true');
+                    });
+                    const activeContent = document.getElementById(sheetId);
+                    if (activeContent) {
+                        activeContent.classList.add('active');
+                        activeContent.removeAttribute('hidden');
+                    }
+                    
+                    setTimeout(() => {
+                        initChartsForSheet(sheetId);
+                    }, 100);
                 });
-                this.nextElementSibling.classList.remove('bg-gray-700', 'text-gray-300');
-                this.nextElementSibling.classList.add('bg-blue-500', 'text-white');
-                currentCeoMetric = this.value;
-                updateIPChart('ip-trend-chart', currentCeoMetric, currentCeoTimeRange);
-            }
+            });
+
+            // --- CEO 總覽頁的子分頁 ---
+            const ceoTabs = document.querySelectorAll('.ceo-tab');
+            const ceoContents = document.querySelectorAll('.ceo-content');
+
+            ceoTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const ceoTabType = tab.getAttribute('data-ceo-tab');
+                    
+                    ceoTabs.forEach(t => {
+                        t.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+                        t.setAttribute('aria-selected', 'false');
+                    });
+                    tab.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+                    tab.setAttribute('aria-selected', 'true');
+
+                    ceoContents.forEach(content => {
+                        content.classList.remove('active');
+                        content.setAttribute('hidden', 'true');
+                    });
+                    const activeContent = document.getElementById(`ceo-${ceoTabType}`);
+                    if (activeContent) {
+                        activeContent.classList.add('active');
+                        activeContent.removeAttribute('hidden');
+                    }
+                    
+                    setTimeout(() => {
+                        initChartsForCeoTab(ceoTabType);
+                    }, 100);
+                });
+            });
+
+            // --- TVBS 新聞網的子分頁 ---
+            const analysisTabs = document.querySelectorAll('.analysis-tab');
+            const analysisContents = document.querySelectorAll('.analysis-content');
+            
+            analysisTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const analysisType = tab.getAttribute('data-analysis');
+                    
+                    analysisTabs.forEach(t => {
+                        t.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+                        t.setAttribute('aria-selected', 'false');
+                    });
+                    tab.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+                    tab.setAttribute('aria-selected', 'true');
+                    
+                    analysisContents.forEach(content => {
+                        content.classList.remove('active');
+                        content.setAttribute('hidden', 'true');
+                    });
+                    const activeContent = document.getElementById(`tvbs-${analysisType}`);
+                    if (activeContent) {
+                        activeContent.classList.add('active');
+                        activeContent.removeAttribute('hidden');
+                    }
+                    
+                    setTimeout(() => {
+                        initChartsForAnalysisTab(analysisType);
+                    }, 100);
+                });
+            });
+
+            // --- CEO 總覽頁的篩選器 ---
+            const timeRangeButtons = document.querySelectorAll('.time-range-button');
+            timeRangeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    timeRangeButtons.forEach(btn => {
+                        btn.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+                        btn.setAttribute('aria-pressed', 'false');
+                    });
+                    button.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+                    button.setAttribute('aria-pressed', 'true');
+                    
+                    const range = button.getAttribute('data-range');
+                    currentCeoTimeRange = range; // 儲存狀態
+                    updateCeoDashboard(currentCeoTimeRange); // 呼叫主更新函數
+                });
+            });
+
+            const metricRadios = document.querySelectorAll('.metric-radio');
+            metricRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        const parent = this.closest('[role="radiogroup"]');
+                        parent.querySelectorAll('label').forEach(label => {
+                            label.classList.remove('bg-blue-500', 'text-white');
+                            label.classList.add('bg-gray-700', 'text-gray-300');
+                        });
+                        this.nextElementSibling.classList.remove('bg-gray-700', 'text-gray-300');
+                        this.nextElementSibling.classList.add('bg-blue-500', 'text-white');
+                        
+                        currentCeoMetric = this.value; // 儲存狀態
+                        // 僅更新圖表，並傳入當前的時間範圍
+                        updateIPChart('ip-trend-chart', currentCeoMetric, currentCeoTimeRange);
+                    }
+                });
+            });
+            
+            // --- 會員組成 IP 篩選器 (已修改為按鈕) ---
+            const compositionIpButtons = document.querySelectorAll('.composition-ip-button');
+            compositionIpButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    compositionIpButtons.forEach(btn => {
+                        btn.classList.replace('sheet-tab-active', 'sheet-tab-inactive');
+                        btn.setAttribute('aria-pressed', 'false');
+                    });
+                    button.classList.replace('sheet-tab-inactive', 'sheet-tab-active');
+                    button.setAttribute('aria-pressed', 'true');
+                    
+                    const selectedIp = button.getAttribute('data-ip');
+                    updateMemberCompositionCharts(selectedIp);
+                });
+            });
         });
-    });
-});
-</script>
+
+        // -------------------------
+        // CEO 總覽頁 - 更新函數
+        // -------------------------
+
+        function updateCeoDashboard(timeRange) {
+            const data = mockCeoData[timeRange] || mockCeoData.monthly;
+            
+            // 1. 更新 KPI 卡片
+            document.querySelector('#ceo-core .kpi-row .card:nth-child(1) .kpi-value').textContent = data.kpi.pv;
+            document.querySelector('#ceo-core .kpi-row .card:nth-child(2) .kpi-value').textContent = data.kpi.uu;
+            document.querySelector('#ceo-core .kpi-row .card:nth-child(3) .kpi-value').textContent = data.kpi.session_uu;
+            document.querySelector('#ceo-core .kpi-row .card:nth-child(4) .kpi-value').textContent = data.kpi.pv_session;
+            
+            // 2. 更新主趨勢圖 (使用當前儲存的指標)
+            updateIPChart('ip-trend-chart', currentCeoMetric, timeRange);
+            
+            // 3. 更新 IP 核心指標表格
+            updateCeoIpTable(data.ipTable);
+        }
+
+        function updateCeoIpTable(ipData) {
+            const tableBody = document.querySelector('#ceo-core .ip-comparison-table tbody');
+            if (!tableBody) return;
+            tableBody.innerHTML = ''; // 清空
+            
+            ipData.forEach(ip => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-700';
+                
+                // 輔助函數來創建變化 span
+                const createChangeSpan = (changeStr) => {
+                    if (!changeStr) return '<div class="metric-change">-</div>';
+                    const isUp = changeStr.includes('+');
+                    const color = isUp ? 'metric-change-up' : 'metric-change-down';
+                    const icon = isUp ? 
+                        '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 01-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707a1 1 0 01-1.414-1.414l5-5A1 1 0 0110 3z" clip-rule="evenodd" /></svg>' :
+                        '<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 011.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 011.414 1.414l-5 5A1 1 0 0110 17z" clip-rule="evenodd" /></svg>';
+                    return `<div class="metric-change ${color}">${icon} ${changeStr.replace('+', '').replace('-', '')}</div>`;
+                };
+                
+                const [pvVal, pvPercent] = (ip.pv || ' ( )').split(' ');
+                const [uuVal, uuPercent] = (ip.uu || ' ( )').split(' ');
+                
+                row.innerHTML = `
+                    <th scope="row" class="p-3 font-medium">${ip.ip}</th>
+                    <td class="p-3">
+                        <div class="metric-value">${pvVal}</div>
+                        <div class="metric-percentage">${pvPercent || ''}</div>
+                        ${createChangeSpan(ip.pv_change)}
+                    </td>
+                    <td class="p-3">
+                        <div class="metric-value">${uuVal}</div>
+                        <div class="metric-percentage">${uuPercent || ''}</div>
+                        ${createChangeSpan(ip.uu_change)}
+                    </td>
+                    <td class="p-3">
+                        <div class="metric-value">${ip.su}</div>
+                        ${createChangeSpan(ip.su_change)}
+                    </td>
+                    <td class="p-3">
+                        <div class="metric-value">${ip.ps}</div>
+                        ${createChangeSpan(ip.ps_change)}
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // -------------------------
+        // 圖表初始化
+        // -------------------------
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#F9FAFB' } }
+            },
+            scales: {
+                x: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } },
+                y: { ticks: { color: '#9CA3AF' }, grid: { color: '#374151' } }
+            }
+        };
+
+        function initCharts() {
+            updateCeoDashboard(currentCeoTimeRange); // 初始載入 CEO 頁 (月)
+            initChartsForAnalysisTab('acquisition'); // 初始載入 TVBS 頁 (第一個 tab)
+        }
+
+        function initChartsForSheet(sheetId) {
+            if (sheetId === 'ceo-view') {
+                updateCeoDashboard(currentCeoTimeRange); // 重新載入 CEO 頁
+                // 確保 CEO 頁的第一個 tab (核心指標) 的圖表被繪製
+                const activeCeoTab = document.querySelector('#ceo-view .ceo-tab.sheet-tab-active');
+                const ceoTabType = activeCeoTab ? activeCeoTab.dataset.ceoTab : 'core';
+                initChartsForCeoTab(ceoTabType);
+            } else if (sheetId === 'tvbs') {
+                // 確保 TVBS 頁的第一個 tab (會員成長) 的圖表被繪製
+                const activeAnalysisTab = document.querySelector('#tvbs .analysis-tab.sheet-tab-active');
+                const analysisType = activeAnalysisTab ? activeAnalysisTab.dataset.analysis : 'acquisition';
+                initChartsForAnalysisTab(analysisType);
+            }
+        }
+
+        function initChartsForCeoTab(ceoTabType) {
+            if (ceoTabType === 'composition') {
+                const activeIpButton = document.querySelector('.composition-ip-button.sheet-tab-active');
+                const selectedIp = activeIpButton ? activeIpButton.dataset.ip : 'overall';
+                updateMemberCompositionCharts(selectedIp); // 初始載入 "整體" 數據
+            } else if (ceoTabType === 'core') {
+                 updateIPChart('ip-trend-chart', currentCeoMetric, currentCeoTimeRange);
+            }
+        }
+        
+        // -------------------------
+        // TVBS 新聞網頁 - 圖表
+        // -------------------------
+        
+        function initChartsForAnalysisTab(analysisType) {
+            if (analysisType === 'acquisition') {
+                renderChart('acquisition-trend-chart', 'line', {
+                    labels: mockData.labels,
+                    datasets: [
+                        { label: '活躍會員數 (M)', data: mockData.acquisitionTrend.active, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 },
+                        { label: '新註冊會員數 (M)', data: mockData.acquisitionTrend.new, borderColor: '#10B981', backgroundColor: '#10B98130', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+                renderChart('acquisition-source-chart', 'line', {
+                    labels: mockData.acquisitionSourceTrend.labels,
+                    datasets: [
+                        { label: 'Search', data: mockData.acquisitionSourceTrend.search, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 },
+                        { label: 'Direct', data: mockData.acquisitionSourceTrend.direct, borderColor: '#10B981', backgroundColor: '#10B98130', fill: true, tension: 0.4 },
+                        { label: 'FB', data: mockData.acquisitionSourceTrend.fb, borderColor: '#F59E0B', backgroundColor: '#F59E0B30', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+            } else if (analysisType === 'retention') {
+                renderChart('seven-day-retention-chart', 'line', {
+                    labels: mockData.retention7Day.labels,
+                    datasets: [{ label: '七日留存率 (%)', data: mockData.retention7Day.data, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 }]
+                }, chartOptions);
+                renderChart('dau-mau-trend-chart', 'line', {
+                    labels: mockData.labels,
+                    datasets: [
+                        { label: 'DAU/MAU ', data: mockData.dauMauTrend.dauMau, borderColor: '#F59E0B', backgroundColor: '#F59E0B30', fill: true, tension: 0.4 },
+                        { label: 'WAU/MAU ', data: mockData.dauMauTrend.wauMau, borderColor: '#10B981', backgroundColor: '#10B98130', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+                renderChart('session-uu-trend-chart', 'line', {
+                    labels: mockData.sessionUuTrend.labels,
+                    datasets: [{ label: '人均訪問次數', data: mockData.sessionUuTrend.data, borderColor: '#8B5CF6', backgroundColor: '#8B5CF630', fill: true, tension: 0.4 }]
+                }, chartOptions);
+                renderChart('session-mau-trend-chart', 'line', {
+                    labels: mockData.sessionDistributionTrend.labels,
+                    datasets: [
+                        { label: 'session=1', data: mockData.sessionDistributionTrend.s1, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: false, tension: 0.4 },
+                        { label: 'session=2-3', data: mockData.sessionDistributionTrend.s2_3, borderColor: '#10B981', backgroundColor: '#10B98130', fill: false, tension: 0.4 },
+                        { label: 'session=4-9', data: mockData.sessionDistributionTrend.s4_9, borderColor: '#F59E0B', backgroundColor: '#F59E0B30', fill: false, tension: 0.4 },
+                        { label: 'session>10', data: mockData.sessionDistributionTrend.s10plus, borderColor: '#EC4899', backgroundColor: '#EC489930', fill: false, tension: 0.4 }
+                    ]
+                }, { ...chartOptions, 
+                        plugins: { ...chartOptions.plugins, legend: { position: 'bottom', labels: { color: '#F9FAFB' } } },
+                        scales: {
+                            ...chartOptions.scales,
+                            y: { ...chartOptions.scales.y, ticks: { color: '#9CA3AF' }, grid: { color: '#374151' }, title: { display: true, text: '用戶佔比 (%)', color: '#9CA3AF'} }
+                        }
+                    });
+            } else if (analysisType === 'engagement') {
+                renderChart('engagement-behavior-chart', 'bar', {
+                    labels: mockData.engagementBehavior.labels,
+                    datasets: [{ label: '點擊行為 (次數)', data: mockData.engagementBehavior.data, backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'] }]
+                }, chartOptions);
+                renderChart('engagement-trend-chart', 'line', {
+                    labels: mockData.labels,
+                    datasets: [
+                        { label: 'PV/Session', data: mockData.engagementTrend.dau, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 },
+                        { label: 'PV', data: mockData.engagementTrend.mau, borderColor: '#F59E0B', backgroundColor: '#F59E0B30', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+            } else if (analysisType === 'activation') {
+                renderChart('activation-funnel-chart', 'bar', {
+                    labels: mockData.activationFunnel.labels,
+                    datasets: [{ label: '價值漏斗 (%)', data: mockData.activationFunnel.data, backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EC4899'] }]
+                }, { ...chartOptions, indexAxis: 'y' });
+                renderChart('activation-trend-chart', 'line', {
+                    labels: mockData.labels,
+                    datasets: [
+                        { label: '註冊率 (%)', data: mockData.activationTrend.registration, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 },
+                        { label: '登入率 (%)', data: mockData.activationTrend.onboarding, borderColor: '#10B981', backgroundColor: '#10B98130', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+                renderChart('appdownload-trend-chart', 'line', {
+                    labels: mockData.labels,
+                    datasets: [
+                        { label: 'Android下載數', data: mockData.activationTrend.registration, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 },
+                        { label: 'IOS下載數', data: mockData.activationTrend.onboarding, borderColor: '#10B981', backgroundColor: '#10B98130', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+                renderChart('cai-trend-chart', 'line', {
+                    labels: mockData.labels,
+                    datasets: [
+                        { label: '流失用戶', data: mockData.activationTrend.registration, borderColor: '#3B82F6', backgroundColor: '#3B82F630', fill: true, tension: 0.4 },
+                        { label: '疏離用戶', data: mockData.activationTrend.onboarding, borderColor: '#10B981', backgroundColor: '#10B98130', fill: true, tension: 0.4 },
+                        { label: '穩定用戶', data: mockData.activationTrend.onboarding, borderColor: '#F59E0B', backgroundColor: '#F59E0B30', fill: true, tension: 0.4 },
+                        { label: '接近用戶', data: mockData.activationTrend.onboarding, borderColor: '#EC4899', backgroundColor: '#EC489930', fill: true, tension: 0.4 },
+                        { label: '積極用戶', data: mockData.activationTrend.onboarding, borderColor: '#8B5CF6', backgroundColor: '#8B5CF630', fill: true, tension: 0.4 }
+                    ]
+                }, chartOptions);
+            }
+        }
+
+        // -------------------------
+        // CEO 會員組成頁 - 圖表
+        // -------------------------
+
+        function updateMemberCompositionCharts(ipFilter) {
+            const data = mockCompositionData[ipFilter] || mockCompositionData.overall;
+            const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#F9FAFB' } } } };
+
+            renderChart('gender-chart', 'doughnut', {
+                labels: data.gender.labels,
+                datasets: [{ data: data.gender.data, backgroundColor: ['#3B82F6', '#EC4899', '#6B7280'] }]
+            }, options);
+            
+            renderChart('age-chart', 'doughnut', {
+                labels: data.age.labels,
+                datasets: [{ data: data.age.data, backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6'] }]
+            }, options);
+            
+            renderChart('region-chart', 'doughnut', {
+                labels: data.region.labels,
+                datasets: [{ data: data.region.data, backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#6B7280'] }]
+            }, options);
+
+            renderChart('registration-source-chart', 'doughnut', {
+                labels: data.registration.labels,
+                datasets: [{ data: data.registration.data, backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#6B7280'] }]
+            }, options);
+        }
+
+        // -------------------------
+        // CEO 核心指標頁 - 圖表
+        // -------------------------
+
+        function updateIPChart(chartId, metric, timeRange) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx) return;
+            
+            if (chartInstances.has(chartId)) {
+                chartInstances.get(chartId).destroy();
+            }
+
+            const dataBundle = mockCeoData[timeRange] || mockCeoData.monthly;
+            const labels = dataBundle.trend.labels; // 動態標籤
+            
+            const dataMap = {
+                'pv': dataBundle.trend.pv,
+                'uu': dataBundle.trend.uu,
+                'session': dataBundle.trend.session,
+                'depth': dataBundle.trend.depth
+            };
+            const metricConfigs = {
+                'pv': { label: '總瀏覽量', color: '#3B82F6' },
+                'uu': { label: '活躍會員數', color: '#10B981' },
+                'session': { label: '人均訪問次數', color: '#F59E0B' },
+                'depth': { label: '單次訪問頁數', color: '#8B5CF6' }
+            };
+            
+            const data = dataMap[metric] || dataMap['pv'];
+            const config = metricConfigs[metric] || metricConfigs['pv'];
+
+            renderChart(chartId, 'line', {
+                labels: labels,
+                datasets: [{
+                    label: config.label,
+                    data: data,
+                    borderColor: config.color,
+                    backgroundColor: config.color + '20',
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: config.color,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4
+                }]
+            }, { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, beginAtZero: true } } });
+        }
+
+        // -------------------------
+        // CEO 核心指標頁 - 主控制函數
+        // -------------------------
+        
+        function updateTrendChart(range) {
+            currentCeoTimeRange = range;
+            updateCeoDashboard(range);
+        }
+
+    </script>
 </body>
 </html>
+
